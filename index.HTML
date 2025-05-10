@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Cricket Scoreboard</title>
+    <style>
+        /* === Modern Design System === */
+        :root {
+            --primary: #2A2A72;
+            --secondary: #009FFD;
+            --accent: #FFA400;
+            --background: #f8f9fa;
+            --text: #2d3436;
+            --success: #00b894;
+            --error: #d63031;
+            --card-bg: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            background: var(--background);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* === Animated Header === */
+        .header {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border-radius: 15px;
+            margin-bottom: 3rem;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            animation: slideIn 0.8s ease-out;
+        }
+
+        /* === Scoreboard Grid === */
+        .scoreboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .team-card {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+            text-align: center;
+        }
+
+        .team-card:hover {
+            transform: translateY(-5px);
+        }
+
+        /* === Player Stats Section === */
+        .player-stats {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        /* === Status Indicators === */
+        .status-indicator {
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.8rem;
+            font-weight: 600;
+        }
+
+        .live-indicator {
+            background: rgba(0, 184, 148, 0.1);
+            color: var(--success);
+        }
+
+        /* === Loading Animation === */
+        .loader {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* === Animations === */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* === Responsive Design === */
+        @media (max-width: 768px) {
+            body { padding: 1rem; }
+            .header { padding: 2rem 1rem; }
+            .team-card { padding: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header Section -->
+        <header class="header">
+            <h1 id="matchTitle">🏏 Live Cricket Scores</h1>
+            <div class="status-indicator live-indicator" id="matchStatus">
+                <div class="live-dot"></div>
+                <span id="statusText">Loading...</span>
+            </div>
+        </header>
+
+        <!-- Scoreboard -->
+        <div class="scoreboard">
+            <div class="team-card">
+                <h2 id="team1Name" class="team-name">-</h2>
+                <div class="score-container">
+                    <p id="team1Score" class="team-score">-/-</p>
+                    <p id="team1Overs" class="team-overs">- Overs</p>
+                </div>
+            </div>
+            <div class="team-card">
+                <h2 id="team2Name" class="team-name">-</h2>
+                <div class="score-container">
+                    <p id="team2Score" class="team-score">-/-</p>
+                    <p id="team2Overs" class="team-overs">- Overs</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Player Statistics -->
+        <div class="player-stats">
+            <h3>📊 Player Performance</h3>
+            <div class="batsmen-section">
+                <h4>Batsmen</h4>
+                <div id="batsmenDetails" class="players-list"></div>
+            </div>
+            <div class="bowler-section">
+                <h4>Bowler</h4>
+                <div id="bowlerDetails" class="players-list"></div>
+            </div>
+        </div>
+
+        <!-- System Status -->
+        <div id="lastUpdated" class="timestamp"></div>
+        <div id="errorMessage" class="error-message"></div>
+    </div>
+
+    <script>
+        // ===== API CONFIGURATION =====
+        // Get free API key from https://www.cricapi.com/
+        const API_ENDPOINT = 'https://api.cricapi.com/v1/currentMatches?apikey=YOUR_API_KEY&offset=0';
+        
+        // ===== DOM ELEMENTS =====
+        const elements = {
+            matchTitle: document.getElementById('matchTitle'),
+            matchStatus: document.getElementById('statusText'),
+            team1Name: document.getElementById('team1Name'),
+            team1Score: document.getElementById('team1Score'),
+            team1Overs: document.getElementById('team1Overs'),
+            team2Name: document.getElementById('team2Name'),
+            team2Score: document.getElementById('team2Score'),
+            team2Overs: document.getElementById('team2Overs'),
+            batsmenDetails: document.getElementById('batsmenDetails'),
+            bowlerDetails: document.getElementById('bowlerDetails'),
+            lastUpdated: document.getElementById('lastUpdated'),
+            errorMessage: document.getElementById('errorMessage')
+        };
+
+        // ===== FETCH DATA =====
+        async function fetchData() {
+            try {
+                showLoading();
+                const response = await fetch(API_ENDPOINT);
+                
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                
+                const data = await response.json();
+                updateUI(data.data[0]); // Using first match from response
+                
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        // ===== UPDATE INTERFACE =====
+        function updateUI(matchData) {
+            // Match Info
+            elements.matchTitle.textContent = `${matchData.teams[0]} vs ${matchData.teams[1]}`;
+            elements.matchStatus.textContent = matchData.status;
+
+            // Team 1 Data
+            elements.team1Name.textContent = matchData.teams[0];
+            elements.team1Score.textContent = `${matchData.score[0]?.r || 0}/${matchData.score[0]?.w || 0}`;
+            elements.team1Overs.textContent = `${matchData.score[0]?.o || 0} Overs`;
+
+            // Team 2 Data
+            elements.team2Name.textContent = matchData.teams[1];
+            elements.team2Score.textContent = `${matchData.score[1]?.r || 0}/${matchData.score[1]?.w || 0}`;
+            elements.team2Overs.textContent = `${matchData.score[1]?.o || 0} Overs`;
+
+            // Update timestamp
+            elements.lastUpdated.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+        }
+
+        // ===== UI STATES =====
+        function showLoading() {
+            elements.errorMessage.textContent = '';
+            elements.matchStatus.innerHTML = '<div class="loader"></div>';
+        }
+
+        function showError(message) {
+            elements.errorMessage.textContent = `⚠️ Error: ${message}`;
+            elements.errorMessage.style.color = var(--error);
+        }
+
+        // ===== INITIALIZE =====
+        fetchData();
+        setInterval(fetchData, 30000); // Refresh every 30 seconds
+
+        // Note: Replace YOUR_API_KEY with actual key from CricAPI
+    </script>
+</body>
+</html>
